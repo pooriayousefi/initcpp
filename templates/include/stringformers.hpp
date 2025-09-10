@@ -9,12 +9,24 @@
 #include <unordered_set>
 #include <unordered_map>
 
+/**********************************************************************************************
+*
+*                   			String Transformers
+*                   			-------------------
+*    			This header provides utility functions for string manipulation,
+*    			including case conversion and tokenization.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
 
 // anonymous namespace for internal linkage
 namespace
 {
     // to lowercase functions
-    export template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
     constexpr decltype(auto) to_lowercase(const std::basic_string<Enc, EncTraits, EncAlloc>& word)
     {
         std::basic_string<Enc, EncTraits, EncAlloc> lowercased_word{};
@@ -23,7 +35,7 @@ namespace
             std::ranges::begin(lowercased_word), [](const auto& c) { return std::tolower(c); });
         return lowercased_word;
     }
-    export template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
     constexpr decltype(auto) to_lowercase(std::basic_string_view<Enc, EncTraits> word_view)
     {
         std::basic_string<Enc, EncTraits, EncAlloc> lowercased_word{};
@@ -34,7 +46,7 @@ namespace
     }
 
     // to uppercase functions
-    export template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
     constexpr decltype(auto) to_uppercase(const std::basic_string<Enc, EncTraits, EncAlloc>& word)
     {
         std::basic_string<Enc, EncTraits, EncAlloc> uppercased_word{};
@@ -43,7 +55,7 @@ namespace
             std::ranges::begin(uppercased_word), [](const auto& c) { return std::toupper(c); });
         return uppercased_word;
     }
-    export template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
     constexpr decltype(auto) to_uppercase(std::basic_string_view<Enc, EncTraits> word_view)
     {
         std::basic_string<Enc, EncTraits, EncAlloc> uppercased_word{};

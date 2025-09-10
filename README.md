@@ -1,6 +1,11 @@
 # init++ 🚀
 
-A modern C++ project initializer that creates well-structured C++ projects with custom utility headers, vcpkg integration, and a command-line build system.
+A modern C++ project initializer that creates well-structured C++ projects with c### Available Options:
+- `--debug`: Debug build with symbols
+- `--release`: Release build with optimizations  
+- `--executable`: Static executable (default)
+- `--static`: Static library (.a)
+- `--dynamic`: Dynamic library (.so)utility headers, vcpkg integration, and a command-line build system.
 
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -10,11 +15,12 @@ A modern C++ project initializer that creates well-structured C++ projects with 
 
 - **🏃‍♂️ Fast Setup**: Create complete C++ projects in seconds
 - **🎯 Modern C++23**: Full support for the latest C++ standard
-- **📦 vcpkg Integration**: Package management made simple
+- **📦 Zero-Config vcpkg**: Fully automated package management with binary caching
 - **🔧 No CMake Required**: Custom command-line build system
 - **📚 Rich Templates**: Pre-built utility headers included
 - **🎨 VSCode Ready**: Complete IDE configuration
 - **📱 Multiple Targets**: Executables, static libs, dynamic libs
+- **🚀 Auto-Updates**: One-command vcpkg updates and baseline management
 
 ## 🚀 Quick Start
 
@@ -30,15 +36,19 @@ cd ~/my-awesome-project
 g++ -std=c++23 builder.cpp -o builder
 ./builder --release --executable
 ./build/release/my_awesome_project
+
+# Add packages (example)
+echo '  "fmt",' >> vcpkg.json  # Add to dependencies array
+./install-packages.sh
 ```
 
 ## 📋 What Gets Created
 
 Every project includes:
 
-- **Custom Headers**: `asyncops.hpp`, `raiiiofsw.hpp`, `stringformers.hpp`, `utilities.hpp`
+- **Custom Headers**: `asyncops.hpp`, `raiiiofsw.hpp`, `stringformers.hpp`, `utilities.hpp` (copied from templates)
 - **Build System**: Command-line builder with multiple configurations
-- **Package Manager**: Local vcpkg installation for dependencies
+- **Package Manager**: Local vcpkg installation copied from template and automatically bootstrapped
 - **IDE Support**: Full VSCode configuration with IntelliSense
 - **Project Structure**: Organized `src/`, `include/`, `tests/`, `build/` directories
 - **Documentation**: Complete README with usage instructions
@@ -47,14 +57,23 @@ Every project includes:
 
 ```
 your-project/
-├── include/                    # Headers + utility templates
-├── src/                        # Source files with examples
-├── tests/                      # Test framework ready
-├── build/debug/               # Debug builds
-├── build/release/             # Optimized builds
-├── .vcpkg/                    # Local package manager
-├── .vscode/                   # IDE configuration
-├── builder.cpp                # Custom build system
+├── include/                    # Header files (copied from templates)
+│   ├── asyncops.hpp           # Async operations & coroutines
+│   ├── raiiiofsw.hpp          # RAII filesystem wrappers
+│   ├── stringformers.hpp     # String formatting utilities
+│   └── utilities.hpp          # General utility functions
+├── src/                       # Source files
+│   └── main.cpp               # Main entry point with basic template
+├── tests/                     # Test directory (empty, ready for use)
+├── build/                     # Build outputs
+│   ├── debug/                 # Debug builds
+│   └── release/               # Release builds
+├── vcpkg/                     # Local vcpkg installation (copied from template)
+├── .vscode/                   # VSCode configuration
+│   ├── settings.json          # C++ IntelliSense settings
+│   └── tasks.json             # Build tasks
+├── builder.cpp                # Custom build system source
+├── vcpkg.json                 # Package manifest
 └── README.md                  # Project documentation
 ```
 
@@ -72,24 +91,23 @@ Full-featured applications with dependency management and build systems.
 ### 🎓 Learning & Teaching
 Great starting point for C++ education with modern best practices.
 
-## 🔧 Build System Features
+## � Package Management
 
 The generated build system supports:
 
-- **Debug/Release** configurations
-- **Static executables** (default)
-- **Static libraries** (.a files)
-- **Dynamic libraries** (.so files)
-- **Automatic dependency detection**
-- **vcpkg integration**
-- **Modern C++23 flags**
-
 ```bash
 # Examples
-./builder --debug --executable      # Debug executable
+./builder --debug --executable      # Debug executable (default: debug mode)
 ./builder --release --static        # Release static library
 ./builder --release --dynamic       # Release dynamic library
 ```
+
+### Available Options:
+- `--debug, -d`: Debug build with symbols
+- `--release, -r`: Release build with optimizations  
+- `--executable, --e`: Static executable (default)
+- `--static, --s`: Static library (.a)
+- `--dynamic, --dy`: Dynamic library (.so)
 
 ## 📦 Template Headers Included
 
@@ -172,11 +190,31 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **C++ Standards Committee** - For continuous language evolution
 - **Open Source Community** - For inspiration and best practices
 
+## � Template Directory Structure
+
+Your `init++` tool requires this structure:
+
+```
+init++/
+├── main.cpp                   # The initializer source
+├── templates/                 # Template files
+│   ├── vcpkg/                # Pre-configured vcpkg installation
+│   └── include/              # Template header files
+│       ├── asyncops.hpp      # Async operations & coroutines
+│       ├── raiiiofsw.hpp     # RAII filesystem wrappers
+│       ├── stringformers.hpp # String formatting utilities
+│       └── utilities.hpp     # General utility functions
+├── README.md                 # This file
+└── QUICKSTART.md             # Quick start guide
+```
+
+---
+
 ## 📞 Support
 
 - **📫 Issues**: [GitHub Issues](https://github.com/pooriayousefi/init++/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/pooriayousefi/init++/discussions)
-- **📧 Contact**: [Your Email] (for direct contact)
+- **📧 Contact**: Direct contact via GitHub
 
 ---
 

@@ -13,6 +13,24 @@
 #include <memory>
 #include <cassert>
 
+/**********************************************************************************************
+*
+*                   			Asynchronous Operations
+*                   			-----------------------
+*    			This header provides utilities for asynchronous programming
+*    			using C++20 coroutines. It includes:
+*    			- A Generator class template for creating coroutine-based generators.
+*    			- A GeneratorFactory class template for managing pools of objects.
+*    			- An awaitable Task class template for defining asynchronous tasks.
+*    			- A SyncWaitTask class template and sync_wait function for synchronously
+*    			  waiting on asynchronous tasks to complete.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
+
 // anonymous namespace
 namespace
 {

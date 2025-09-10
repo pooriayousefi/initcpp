@@ -7,7 +7,23 @@
 #include <fstream>
 #include <string>
 
-// toolb0x namespace
+/**********************************************************************************************
+*
+*                   			RAII Input/Output File Stream Wrapper
+*                   			-----------------------
+*    			This header provides a RAII wrapper for basic input/output
+*    			file streams. It includes:
+*    			- A BasicInputFileStreamWrapper class template for managing file streams.
+*    			- A BasicOutputFileStreamWrapper class template for managing file streams.
+*    			- Specialization for std::byte for binary file streams.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
+
+// anonymous namespace
 namespace
 {
 	// Resource Acquisition Is Initialization (RAII) namespace
@@ -42,13 +58,13 @@ namespace
 				if (!is_open())
 					throw std::runtime_error(
 						std::string{
-							std::string{"ERROR! Cannot open "} +
+							std::string{ "ERROR! Cannot open "} +
 							file_path.string() +
-							std::string{" file in raii::BasicInputFileStreamWrapper<"} +
-							std::string{typeid(Elem).name()} +
-							std::string{", "} +
-							std::string{typeid(Traits).name()} +
-							std::string{", "} +
+							std::string{ " file in raii::BasicInputFileStreamWrapper<" } +
+							std::string{ typeid(Elem).name() } +
+							std::string{ ", " } +
+							std::string{ typeid(Traits).name() } +
+							std::string{ ", " } +
 							std::string{ typeid(Alloc).name() } +
 							std::string{ ">::open() method." }
 						}.c_str()

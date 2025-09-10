@@ -16,6 +16,30 @@
 #include <unordered_map>
 #include <string_view>
 #include <random>
+#include <variant>
+
+/**********************************************************************************************
+*
+*                   			    Utilities Header
+*                   			-----------------------
+*    		This header provides general utility functions and classes.
+*    		It includes:
+*    		- A wait_for class template for sleeping for various time durations.
+*    		- A runtime function template for measuring the execution time of a callable.
+*    		- A convert namespace with functions for unit conversions and number base conversions.
+*    		- A countdown function template for displaying a countdown in seconds.
+*    		- An iterate function template for iterating over a range with a specified step size
+*    		- Specializations of standard functors for std::byte and std::reference_wrapper.
+*    		- A histogram function template for counting occurrences of elements in a range.
+*    		- A frequencies function template for counting word frequencies in a string view.
+*    		- A do_n_times_shuffle_and_sample function template for shuffling and sampling a range.
+*    		- A Result struct template for encapsulating expected values or exceptions.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
 
 // anonymous namespace
 namespace
@@ -24,7 +48,7 @@ namespace
     template<typename T> concept Arithmetic = std::floating_point<T> || std::integral<T>;
 
     // wait for some times in different time units
-    export template<Arithmetic T> 
+    template<Arithmetic T> 
     class wait_for
     {
     public:
@@ -338,11 +362,10 @@ namespace
     template<typename Expected>
     struct Result
     {
-        using type = std::variant<std::monostate, Expected, std::exception_ptr>;
-    };
-    template<>
-    struct Result<void> 
-    {
-        using type = std::variant<std::monostate, std::exception_ptr>;
+        using type = std::conditional_t<
+            std::is_void_v<Expected>,
+            std::variant<std::monostate, std::exception>,
+            std::variant<std::monostate, Expected, std::exception>
+        >;
     };
 }

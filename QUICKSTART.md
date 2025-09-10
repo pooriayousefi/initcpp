@@ -1,6 +1,13 @@
 # init++ Quick Start Guide
 
-A modern C++ project initializer that creates well-structured C++ projects with custom utility headers, vcpkg integration, and a command-line build system.
+A modern C++ project initializer that cre### Build Types
+- `--debug`: Debug build with symbols and no optimization
+- `--release`: Release build with optimizations
+
+### Output Types  
+- `--executable`: Static executable (default)
+- `--static`: Static library (.a)
+- `--dynamic`: Dynamic library (.so)l-structured C++ projects with custom utility headers, vcpkg integration, and a command-line build system.
 
 ## 🚀 Quick Start
 
@@ -32,37 +39,38 @@ g++ -std=c++23 builder.cpp -o builder
 The `init++` tool creates a complete C++ project structure with:
 
 - **Modern C++23 support**
-- **Custom utility headers** (asyncops, RAII filesystem wrappers, string formatters, utilities)
-- **vcpkg package manager** (copied from template for fast setup)
+- **Custom utility headers** (copied from templates: asyncops, RAII filesystem wrappers, string formatters, utilities)
+- **vcpkg package manager** (copied from template directory and automatically bootstrapped)
 - **Command-line build system** (no CMake/Makefile needed)
 - **VSCode configuration** (IntelliSense, tasks, formatting)
 - **Multiple build targets** (executable, static lib, dynamic lib)
-- **Test framework** with example tests
+- **Basic project structure** with organized directories
 
 ## 🏗️ Project Structure Created
 
 ```
 your-project/
-├── include/                    # Header files
+├── include/                    # Header files (copied from templates)
 │   ├── asyncops.hpp           # Async operations & coroutines
 │   ├── raiiiofsw.hpp          # RAII filesystem wrappers
 │   ├── stringformers.hpp     # String formatting utilities
-│   ├── utilities.hpp          # General utility functions
-│   └── your_project.hpp       # Generated project header
+│   └── utilities.hpp          # General utility functions
 ├── src/                       # Source files
-│   ├── main.cpp               # Main entry point
-│   └── your_project.cpp       # Generated project implementation
-├── tests/                     # Test files
-│   └── test_main.cpp          # Example tests
+│   └── main.cpp               # Main entry point with basic template
+├── tests/                     # Test directory (empty, ready for use)
 ├── build/                     # Build outputs
 │   ├── debug/                 # Debug builds
 │   └── release/               # Release builds
-├── .vcpkg/                    # Local vcpkg installation
+├── vcpkg/                     # Local vcpkg installation (copied and bootstrapped automatically)
+├── .vcpkg-cache/              # Binary package cache (automatic)
 ├── .vscode/                   # VSCode configuration
 │   ├── settings.json          # C++ IntelliSense settings
 │   └── tasks.json             # Build tasks
-├── builder.cpp                # Build system source
+├── builder.cpp                # Build system source code
 ├── vcpkg.json                 # Package manifest
+├── vcpkg-configuration.json   # vcpkg configuration (automatic)
+├── install-packages.sh        # Automated package installer
+├── update-vcpkg.sh            # vcpkg updater script
 └── README.md                  # Project documentation
 ```
 
@@ -77,7 +85,7 @@ The generated build system supports multiple configurations:
 ### Output Types  
 - `--executable, --e`: Static executable (default)
 - `--static, --s`: Static library (.a)
-- `--dynamic, --d`: Dynamic library (.so)
+- `--dynamic, --dy`: Dynamic library (.so)
 
 ### Examples
 ```bash
@@ -93,10 +101,24 @@ The generated build system supports multiple configurations:
 
 ## 📦 Package Management
 
+### Simple Package Installation
+
+The project includes automated scripts for easy package management:
+
+```bash
+# Install packages from vcpkg.json
+./install-packages.sh
+
+# Install specific packages directly
+./install-packages.sh fmt spdlog nlohmann-json
+```
+
 ### Adding Dependencies
 1. Edit `vcpkg.json` to add packages:
 ```json
 {
+  "name": "your-project",
+  "version": "1.0.0",
   "dependencies": [
     "fmt",
     "spdlog",
@@ -107,10 +129,22 @@ The generated build system supports multiple configurations:
 
 2. Install packages:
 ```bash
-./.vcpkg/vcpkg install
+./install-packages.sh
 ```
 
 3. The build system automatically includes vcpkg paths
+
+### Updating vcpkg
+
+```bash
+# Update vcpkg to latest version and baseline
+./update-vcpkg.sh
+```
+
+This automatically:
+- Updates vcpkg to the latest version
+- Updates the baseline in vcpkg.json
+- Rebuilds vcpkg executable
 
 ## 🎨 Template Headers Included
 
@@ -156,11 +190,9 @@ g++ -std=c++23 builder.cpp -o builder
 
 ### 3. Testing
 ```bash
-# Compile and run tests manually
-g++ -std=c++23 -Iinclude tests/test_main.cpp src/*.cpp -o build/debug/tests
-./build/debug/tests
-
-# Or add test compilation to builder.cpp if needed
+# Create your own tests in tests/ directory
+# No automatic test framework is provided, but directory structure is ready
+# You can use any testing framework like Catch2, Google Test, etc.
 ```
 
 ### 4. VSCode Integration
@@ -178,11 +210,13 @@ Your `init++` tool requires this structure:
 init++/
 ├── main.cpp                   # The initializer source
 ├── templates/                 # Template files
-│   ├── .vcpkg/               # Pre-configured vcpkg installation
-│   ├── asyncops.hpp          # Template headers
-│   ├── raiiiofsw.hpp
-│   ├── stringformers.hpp
-│   └── utilities.hpp
+│   ├── vcpkg/                # Pre-configured vcpkg installation
+│   └── include/              # Template header files
+│       ├── asyncops.hpp      # Async operations & coroutines
+│       ├── raiiiofsw.hpp     # RAII filesystem wrappers
+│       ├── stringformers.hpp # String formatting utilities
+│       └── utilities.hpp     # General utility functions
+├── README.md                 # Main documentation
 └── QUICKSTART.md             # This file
 ```
 
@@ -208,8 +242,8 @@ cd ~/libraries/my-lib
 ```bash
 ./init++ ~/apps/my-app
 cd ~/apps/my-app
-# Add dependencies to vcpkg.json
-./.vcpkg/vcpkg install
+# Add dependencies to vcpkg.json, then:
+./install-packages.sh
 ./builder --release --executable
 ```
 
@@ -221,20 +255,23 @@ cd ~/apps/my-app
 - The build system uses `-std=c++23` with modern optimizations
 
 ### vcpkg Management
-- Template vcpkg is pre-configured (no download time)
-- Each project gets its own vcpkg copy (isolated dependencies)
-- Packages install quickly from local cache
+- Template vcpkg is automatically copied, bootstrapped, and configured
+- Binary caching is enabled by default (stored in `.vcpkg-cache/`)
+- Automatic baseline detection and management
+- Each project gets its own isolated vcpkg installation
+- Use `./install-packages.sh` for easy package installation
+- Use `./update-vcpkg.sh` for easy vcpkg updates
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
 **"Template vcpkg not found"**
-- Ensure `templates/.vcpkg/` exists in your init++ directory
-- Copy a working vcpkg installation to `templates/.vcpkg/`
+- Ensure `templates/vcpkg/` exists in your init++ directory
+- Copy a working vcpkg installation to `templates/vcpkg/`
 
 **"Template header not found"**
-- Verify all `.hpp` files exist in `templates/` directory
+- Verify all `.hpp` files exist in `templates/include/` directory
 - Check file permissions (should be readable)
 
 **Build errors**
@@ -243,9 +280,10 @@ cd ~/apps/my-app
 - Verify include paths in build system
 
 **vcpkg package installation fails**
-- Run `./.vcpkg/vcpkg integrate install` in project
+- Run `./install-packages.sh` instead of directly using vcpkg
 - Check network connectivity for package downloads
 - Verify `vcpkg.json` syntax is correct
+- Try `./update-vcpkg.sh` if you suspect vcpkg issues
 
 ## 📚 Advanced Usage
 

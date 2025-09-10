@@ -1,6 +1,9 @@
 # Build outputs
 init++
+builder
 *.o
+*.a
+*.so
 *.exe
 
 # IDE files
@@ -9,6 +12,14 @@ init++
 *.swp
 *.swo
 *~
+
+# vcpkg template (users should download their own vcpkg)
+# The init++ tool expects a vcpkg installation in templates/vcpkg/
+# Users can clone vcpkg there: git clone https://github.com/Microsoft/vcpkg.git templates/vcpkg
+templates/vcpkg/
+
+# Generated project caches
+.vcpkg-cache/
 
 # OS generated files
 .DS_Store
