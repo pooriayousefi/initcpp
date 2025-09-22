@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
         std::ofstream file(file_path);
         if (!file.is_open())
         {
-            throw std::runtime_error("Could not create file: " + file_path.string());
+            throw std::runtime_error("ERROR! Could not create file: " + file_path.string());
         }
         file << content;
         file.flush();
@@ -65,12 +65,12 @@ int main(int argc, char* argv[])
         std::vector<std::string> directories = {
             project_path,
             project_path + "/include",
+            project_path + "/include/core",
             project_path + "/src", 
             project_path + "/build",
             project_path + "/build/debug",
             project_path + "/build/release",
-            project_path + "/tests",
-            project_path + "/.vscode"
+            project_path + "/tests"
         };
         
         for (const auto& dir : directories)
@@ -80,173 +80,788 @@ int main(int argc, char* argv[])
         }
     };
     
-    // Setup vcpkg from template with full automation
-    auto setup_vcpkg = [&]()
-    {
-        std::cout << "Setting up vcpkg with full automation..." << std::endl;
-        
-        const std::string vcpkg_src_path = fs::current_path().string() + "/templates/vcpkg";
-        const std::string vcpkg_dst_path = project_path + "/vcpkg";
-        
-        // Check if template vcpkg exists
-        if (!fs::exists(fs::path(vcpkg_src_path)))
-        {
-            std::string errmsg{"Warning: Template vcpkg not found at " };
-            errmsg += vcpkg_src_path;
-            errmsg += "\nSkipping vcpkg setup. You can manually set up vcpkg if needed.";
-            throw std::runtime_error(errmsg.c_str());
-        }
-        
-        // Copy template vcpkg to project directory
-        std::cout << "Copying vcpkg from template directory..." << std::endl;
-        std::string copy_cmd = "cp -r " + vcpkg_src_path + " " + vcpkg_dst_path;
-        if (execute_command(copy_cmd) != 0)
-        {
-            throw std::runtime_error("Warning: Failed to copy vcpkg from template. You can manually set up vcpkg if needed.\n");
-        }
-        
-        // Bootstrap vcpkg
-        std::cout << "Bootstrapping vcpkg..." << std::endl;
-        std::string bootstrap_cmd = "cd " + vcpkg_dst_path + " && ./bootstrap-vcpkg.sh";
-        if (execute_command(bootstrap_cmd) != 0)
-        {
-            std::cout << "Warning: vcpkg bootstrap failed. You may need to run './vcpkg/bootstrap-vcpkg.sh' manually." << std::endl;
-        }
-        else
-        {
-            std::cout << "vcpkg bootstrapped successfully!" << std::endl;
-        }
-        
-        // Get latest vcpkg baseline automatically
-        std::cout << "Getting latest vcpkg baseline..." << std::endl;
-        std::string baseline_cmd = "cd " + vcpkg_dst_path + " && git rev-parse HEAD";
-        std::string baseline_hash;
-        
-        // Execute and capture output
-        FILE* pipe = popen(baseline_cmd.c_str(), "r");
-        if (pipe) {
-            char buffer[128];
-            if (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-                baseline_hash = std::string(buffer);
-                // Remove newline
-                baseline_hash.erase(baseline_hash.find_last_not_of(" \n\r\t") + 1);
-            }
-            pclose(pipe);
-        }
-        
-        if (baseline_hash.empty()) {
-            baseline_hash = "latest"; // fallback
-            std::cout << "Warning: Could not determine vcpkg baseline, using 'latest'" << std::endl;
-        } else {
-            std::cout << "Using vcpkg baseline: " << baseline_hash << std::endl;
-        }
-        
-        // Setup binary caching automatically
-        std::cout << "Setting up binary caching..." << std::endl;
-        std::string cache_dir = project_path + "/.vcpkg-cache";
-        fs::create_directories(cache_dir);
-        
-        // Create vcpkg configuration for binary caching
-        std::string vcpkg_config = "{\n";
-        vcpkg_config += "  \"default-registry\": {\n";
-        vcpkg_config += "    \"kind\": \"git\",\n";
-        vcpkg_config += "    \"repository\": \"https://github.com/Microsoft/vcpkg\",\n";
-        vcpkg_config += "    \"baseline\": \"" + baseline_hash + "\"\n";
-        vcpkg_config += "  },\n";
-        vcpkg_config += "  \"registries\": []\n";
-        vcpkg_config += "}";
-        
-        write_file(project_path + "/vcpkg-configuration.json", vcpkg_config);
-        
-        // Create vcpkg.json manifest with automatic baseline
-        std::string vcpkg_manifest = "{\n";
-        vcpkg_manifest += "  \"$schema\": \"https://raw.githubusercontent.com/Microsoft/vcpkg/main/scripts/vcpkg.schema.json\",\n";
-        vcpkg_manifest += "  \"name\": \"" + project_name + "\",\n";
-        vcpkg_manifest += "  \"version\": \"1.0.0\",\n";
-        vcpkg_manifest += "  \"description\": \"" + project_name + " C++ project with automated vcpkg management\",\n";
-        vcpkg_manifest += "  \"homepage\": \"\",\n";
-        vcpkg_manifest += "  \"documentation\": \"\",\n";
-        vcpkg_manifest += "  \"supports\": \"linux\",\n";
-        vcpkg_manifest += "  \"dependencies\": [\n";
-        vcpkg_manifest += "    \n";
-        vcpkg_manifest += "  ],\n";
-        vcpkg_manifest += "  \"builtin-baseline\": \"" + baseline_hash + "\"\n";
-        vcpkg_manifest += "}";
-        
-        write_file(project_path + "/vcpkg.json", vcpkg_manifest);
-        
-        // Create automatic package installer script
-        std::string install_script = "#!/bin/bash\n";
-        install_script += "# Automated vcpkg package installer\n";
-        install_script += "# Usage: ./install-packages.sh [package1] [package2] ...\n\n";
-        install_script += "set -e\n\n";
-        install_script += "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n";
-        install_script += "VCPKG_DIR=\"$SCRIPT_DIR/vcpkg\"\n";
-        install_script += "CACHE_DIR=\"$SCRIPT_DIR/.vcpkg-cache\"\n\n";
-        install_script += "# Set up binary caching\n";
-        install_script += "export VCPKG_BINARY_SOURCES=\"clear;files,$CACHE_DIR,readwrite\"\n\n";
-        install_script += "echo \"Installing packages with binary caching...\"\n";
-        install_script += "echo \"Cache directory: $CACHE_DIR\"\n\n";
-        install_script += "if [ $# -eq 0 ]; then\n";
-        install_script += "    echo \"Installing packages from vcpkg.json...\"\n";
-        install_script += "    cd \"$SCRIPT_DIR\"\n";
-        install_script += "    \"$VCPKG_DIR/vcpkg\" install\n";
-        install_script += "else\n";
-        install_script += "    echo \"Installing specified packages: $@\"\n";
-        install_script += "    cd \"$SCRIPT_DIR\"\n";
-        install_script += "    \"$VCPKG_DIR/vcpkg\" install \"$@\"\n";
-        install_script += "fi\n\n";
-        install_script += "echo \"Package installation complete!\"\n";
-        install_script += "echo \"Binary cache size: $(du -sh \"$CACHE_DIR\" 2>/dev/null | cut -f1 || echo 'N/A')\"\n";
-        
-        write_file(project_path + "/install-packages.sh", install_script);
-        
-        // Make script executable
-        execute_command("chmod +x " + project_path + "/install-packages.sh");
-        
-        // Create vcpkg update script
-        std::string update_script = "#!/bin/bash\n";
-        update_script += "# Automated vcpkg baseline updater\n";
-        update_script += "# This script updates vcpkg to the latest version and updates the baseline\n\n";
-        update_script += "set -e\n\n";
-        update_script += "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n";
-        update_script += "VCPKG_DIR=\"$SCRIPT_DIR/vcpkg\"\n\n";
-        update_script += "echo \"Updating vcpkg to latest version...\"\n";
-        update_script += "cd \"$VCPKG_DIR\"\n";
-        update_script += "git pull origin master\n";
-        update_script += "./bootstrap-vcpkg.sh\n\n";
-        update_script += "# Get new baseline\n";
-        update_script += "NEW_BASELINE=$(git rev-parse HEAD)\n";
-        update_script += "echo \"New baseline: $NEW_BASELINE\"\n\n";
-        update_script += "# Update vcpkg.json with new baseline\n";
-        update_script += "cd \"$SCRIPT_DIR\"\n";
-        update_script += "sed -i \"s/\\\"builtin-baseline\\\": \\\".*\\\"/\\\"builtin-baseline\\\": \\\"$NEW_BASELINE\\\"/\" vcpkg.json\n";
-        update_script += "sed -i \"s/\\\"baseline\\\": \\\".*\\\"/\\\"baseline\\\": \\\"$NEW_BASELINE\\\"/\" vcpkg-configuration.json\n\n";
-        update_script += "echo \"vcpkg updated successfully!\"\n";
-        update_script += "echo \"Updated vcpkg.json and vcpkg-configuration.json with new baseline: $NEW_BASELINE\"\n";
-        update_script += "echo \"Run ./install-packages.sh to reinstall packages with the new version\"\n";
-        
-        write_file(project_path + "/update-vcpkg.sh", update_script);
-        
-        // Make script executable
-        execute_command("chmod +x " + project_path + "/update-vcpkg.sh");
-        
-        std::cout << "vcpkg setup complete with full automation!" << std::endl;
-        std::cout << "- Binary caching enabled (cache: .vcpkg-cache/)" << std::endl;
-        std::cout << "- Use ./install-packages.sh to install packages" << std::endl;
-        std::cout << "- Use ./update-vcpkg.sh to update vcpkg baseline" << std::endl;
-    };
-
-    // Create initial source files
+    // Create template header files
     auto copy_template_headers = [&]()
     {
-        std::cout << "Copying template header files..." << std::endl;
+        std::cout << "Creating template header files..." << std::endl;
         
-        auto include_src_path = fs::current_path() / fs::path("templates/include");
-        auto include_dst_path = fs::path(project_path) / fs::path("include");
+        // asyncops.hpp content
+        std::string asyncops_content = R"(
+#pragma once
+#include <stdexcept>
+#include <exception>
+#include <iostream>
+#include <coroutine>
+#include <vector>
+#include <forward_list>
+#include <thread>
+#include <variant>
+#include <utility>
+#include <semaphore>
+#include <memory>
+#include <cassert>
+
+/**********************************************************************************************
+*
+*                   			Asynchronous Operations
+*                   			-----------------------
+*    			This header provides utilities for asynchronous programming
+*    			using C++20 coroutines. It includes:
+*    			- A Generator class template for creating coroutine-based generators.
+*    			- A GeneratorFactory class template for managing pools of objects.
+*    			- An awaitable Task class template for defining asynchronous tasks.
+*    			- A SyncWaitTask class template and sync_wait function for synchronously
+*    			  waiting on asynchronous tasks to complete.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
+
+// namespace pooriayousefi::core
+namespace pooriayousefi::core
+{
+    template<class T> 
+	struct Generator
+	{
+		struct Promise
+		{
+			T current_value;
+			inline decltype(auto) initial_suspend() { return std::suspend_always{}; }
+			inline decltype(auto) final_suspend() noexcept { return std::suspend_always{}; }
+			inline decltype(auto) get_return_object() { return Generator{ std::coroutine_handle<Promise>::from_promise(*this) }; }
+			inline decltype(auto) return_void() { return std::suspend_never{}; }
+			inline decltype(auto) yield_value(T&& value) noexcept { current_value = value; return std::suspend_always{}; }
+			inline void unhandled_exception() { std::terminate(); }
+		};
+        using promise_type = Promise;
+		struct Sentinel {};
+		struct Iterator
+		{
+			using iterator_category = std::input_iterator_tag;
+			using value_type = T;
+			using difference_type = ptrdiff_t;
+			using pointer = T*;
+			using reference = T&;
+			using const_reference = const T&;
+			std::coroutine_handle<promise_type> handle;
+			explicit Iterator(std::coroutine_handle<promise_type>& h) :handle{ h } {}
+			inline Iterator& operator++()
+			{
+				handle.resume();
+				return *this;
+			}
+			inline void operator++(int) { (void)operator++(); }
+			inline reference operator*() { return handle.promise().current_value; }
+			inline pointer operator->() { return std::addressof(operator*()); }
+			inline const_reference operator*() const { return handle.promise().current_value; }
+			inline pointer operator->() const { return std::addressof(operator*()); }
+			inline bool operator==(Sentinel) { return handle.done(); }
+			inline bool operator==(Sentinel) const { return handle.done(); }
+		};
+		std::coroutine_handle<promise_type> handle;
+		explicit Generator(std::coroutine_handle<promise_type> h) :handle{ h } {}
+		~Generator() { if (handle) handle.destroy(); }
+		Generator(const Generator&) = delete;
+		Generator(Generator&& other) noexcept :handle(other.handle) { other.handle = nullptr; }
+		constexpr Generator& operator=(const Generator&) = delete;
+		constexpr Generator& operator=(Generator&& other) noexcept { handle = other.handle; other.handle = nullptr; return *this; }
+		inline T get_value() { return handle.promise().current_value; }
+		inline bool next() { handle.resume(); return !handle.done(); }
+		inline bool resume() { handle.resume(); return !handle.done(); }
+		inline decltype(auto) begin()
+		{
+			handle.resume();
+			return Iterator{ handle };
+		}
+		inline decltype(auto) end() { return Sentinel{}; }
+		inline T get_next_value()
+		{
+			next();
+			if (handle.done()) throw std::out_of_range{ "Generator exhausted" };
+			return get_value();
+		}
+	};
+
+    template<class T, size_t N = 128> 
+	class GeneratorFactory
+	{
+	public:
+        using Pool = std::vector<T>;
+        using Pools = std::forward_list<Pool>;
+        static constexpr inline size_t number_of_objects_in_each_pool = N;
+
+		GeneratorFactory():m_pools{}, m_object_counter{ 0 }
+		{
+			m_pools.emplace_front(Pool(number_of_objects_in_each_pool, T{}));
+		}
+
+		virtual ~GeneratorFactory()
+		{
+			for (auto& pool : m_pools)
+			{
+				pool.clear();
+			}
+			m_pools.clear();
+		}
+
+		inline Generator<std::shared_ptr<T>> generate()
+		{
+			while (true)
+			{
+                if (m_object_counter < number_of_objects_in_each_pool)
+                {
+                    co_yield std::make_shared<T>(m_pools.begin()->data()[m_object_counter++]);
+                }
+                else
+                {
+                    m_pools.emplace_front(Pool(number_of_objects_in_each_pool, T{}));
+                    m_object_counter = 0;
+                }
+			}
+		}
+	private:
+		Pools m_pools;
+		size_t m_object_counter;
+	};
+
+	template<class T> 
+    struct Task
+	{
+		struct promise_type
+		{
+			std::variant<std::monostate, T, std::exception_ptr> result;
+			std::coroutine_handle<> continuation;
+			constexpr decltype(auto) get_return_object() noexcept { return Task{ *this }; }
+			constexpr void return_value(T value) { result.template emplace<1>(std::move(value)); }
+			constexpr void unhandled_exception() noexcept { result.template emplace<2>(std::current_exception()); }
+			constexpr decltype(auto) initial_suspend() { return std::suspend_always{}; }
+			struct awaitable
+			{
+				constexpr bool await_ready() noexcept { return false; }
+				constexpr decltype(auto) await_suspend(std::coroutine_handle<promise_type> h) noexcept
+				{
+					return h.promise().continuation;
+				}
+				constexpr void await_resume() noexcept {}
+			};
+			constexpr decltype(auto) final_suspend() noexcept { return awaitable{}; }
+		};
+		std::coroutine_handle<promise_type> handle;
+		explicit Task(promise_type& p) noexcept :handle{ std::coroutine_handle<promise_type>::from_promise(p) } {}
+		Task(Task&& t) noexcept :handle{ t.handle } {}
+		~Task() { if (handle) handle.destroy(); }
+		constexpr bool await_ready() { return false; }
+		constexpr decltype(auto) await_suspend(std::coroutine_handle<> c)
+		{
+			handle.promise().continuation = c;
+			return handle;
+		}
+		constexpr T await_resume()
+		{
+			auto& result = handle.promise().result;
+			if (result.index() == 1)
+				return std::get<1>(std::move(result));
+			else
+				std::rethrow_exception(std::get<2>(std::move(result)));
+		}
+	};
+	template<> 
+    struct Task<void>
+	{
+		struct promise_type
+		{
+			std::exception_ptr e;
+			std::coroutine_handle<> continuation;
+			inline decltype(auto) get_return_object() noexcept { return Task{ *this }; }
+			constexpr void return_void() {}
+			inline void unhandled_exception() noexcept { e = std::current_exception(); }
+			constexpr decltype(auto) initial_suspend() { return std::suspend_always{}; }
+			struct awaitable
+			{
+				constexpr bool await_ready() noexcept { return false; }
+				inline decltype(auto) await_suspend(std::coroutine_handle<promise_type> h) noexcept
+				{
+					return h.promise().continuation;
+				}
+				constexpr void await_resume() noexcept {}
+			};
+			constexpr decltype(auto) final_suspend() noexcept { return awaitable{}; }
+		};
+		std::coroutine_handle<promise_type> handle;
+		explicit Task(promise_type& p) noexcept :handle{ std::coroutine_handle<promise_type>::from_promise(p) } {}
+		Task(Task&& t) noexcept :handle{ t.handle } {}
+		~Task() { if (handle) handle.destroy(); }
+		constexpr bool await_ready() { return false; }
+		inline decltype(auto) await_suspend(std::coroutine_handle<> c)
+		{
+			handle.promise().continuation = c;
+			return handle;
+		}
+		inline void await_resume()
+		{
+			if (handle.promise().e)
+				std::rethrow_exception(handle.promise().e);
+		}
+	};
+
+	template<class T> using ResultType = decltype(std::declval<T&>().await_resume());
+
+	template<class T> 
+    struct SyncWaitTask
+	{
+		struct promise_type
+		{
+			T* value{ nullptr };
+			std::exception_ptr error{ nullptr };
+			std::binary_semaphore sema4{ 0 };
+			inline SyncWaitTask get_return_object() noexcept { return SyncWaitTask{ *this }; }
+			constexpr void unhandled_exception() noexcept { error = std::current_exception(); }
+			constexpr decltype(auto) yield_value(T&& x) noexcept
+			{
+				value = std::addressof(x);
+				return final_suspend();
+			}
+			constexpr decltype(auto) initial_suspend() noexcept { return std::suspend_always{}; }
+			struct awaitable
+			{
+				constexpr bool await_ready() noexcept { return false; }
+				constexpr void await_suspend(std::coroutine_handle<promise_type> h) noexcept { h.promise().sema4.release(); }
+				constexpr void await_resume() noexcept {}
+			};
+			constexpr decltype(auto) final_suspend() noexcept { return awaitable{}; }
+			constexpr void return_void() noexcept { assert(false); }
+		};
+		std::coroutine_handle<promise_type> handle;
+		explicit SyncWaitTask(promise_type& p) noexcept :handle{ std::coroutine_handle<promise_type>::from_promise(p) } {}
+		SyncWaitTask(SyncWaitTask&& t) noexcept :handle{ t.handle } {}
+		~SyncWaitTask() { if (handle) handle.destroy(); }
+		inline T&& get()
+		{
+			auto& p = handle.promise();
+			handle.resume();
+			p.sema4.acquire();
+			if (p.error)
+				std::rethrow_exception(p.error);
+			return static_cast<T&&>(*p.value);
+		}
+	};
+
+	template<class T> ResultType<T> sync_wait(T&& Task)
+	{
+		if constexpr (std::is_void_v<ResultType<T>>)
+		{
+			struct empty_type {};
+			auto coro = [&]() -> SyncWaitTask<empty_type>
+				{
+					co_await std::forward<T>(Task);
+					co_yield empty_type{};
+					assert(false);
+				};
+			coro().get();
+		}
+		else
+		{
+			auto coro = [&]() -> SyncWaitTask<ResultType<T>>
+				{
+					co_yield co_await std::forward<T>(Task);
+					assert(false);
+				};
+			return coro().get();
+		}
+	}
+}
+)";
+
+        // raiiiofsw.hpp content
+        std::string raiiiofsw_content = R"(
+#pragma once
+#include <type_traits>
+#include <filesystem>
+#include <stdexcept>
+#include <typeinfo>
+#include <fstream>
+#include <string>
+
+/**********************************************************************************************
+*
+*                   			RAII Input/Output File Stream Wrapper
+*                   			-----------------------
+*    			This header provides a RAII wrapper for basic input/output
+*    			file streams. It includes:
+*    			- A BasicInputFileStreamWrapper class template for managing file streams.
+*    			- A BasicOutputFileStreamWrapper class template for managing file streams.
+*    			- Specialization for std::byte for binary file streams.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
+
+namespace pooriayousefi::core
+{
+	namespace raii
+	{
+		template<typename Elem, typename Traits = std::char_traits<Elem>, typename Alloc = std::allocator<Elem>>
+		struct BasicInputFileStreamWrapper
+		{
+			using file_stream_type = std::basic_ifstream<Elem, Traits>;
+			using type = BasicInputFileStreamWrapper<Elem, Traits, Alloc>;
+			using string_type = std::basic_string<Elem, Traits, Alloc>;
+			using stream_buffer_iterator = std::istreambuf_iterator<Elem, Traits>;
+
+			file_stream_type file_stream;
+
+			BasicInputFileStreamWrapper() :file_stream{} {}
+			virtual ~BasicInputFileStreamWrapper() { if (is_open()) close(); }
+
+			template<typename T> constexpr type& operator>>(T& value) { file_stream >> value; return *this; }
+
+			bool is_open() { return file_stream.is_open(); }
+			void close() { file_stream.close(); }
+			void open(std::filesystem::path file_path, std::ios_base::openmode open_mode = std::ios_base::in)
+			{
+				file_stream.open(file_path, std::ios_base::in | open_mode);
+				if (!is_open())
+					throw std::runtime_error(
+						std::string{
+							std::string{ "ERROR! Cannot open "} +
+							file_path.string() +
+							std::string{ " file in raii::BasicInputFileStreamWrapper<" } +
+							std::string{ typeid(Elem).name() } +
+							std::string{ ", " } +
+							std::string{ typeid(Traits).name() } +
+							std::string{ ", " } +
+							std::string{ typeid(Alloc).name() } +
+							std::string{ ">::open() method." }
+						}.c_str()
+					);
+			}
+		};
+
+		template<>
+		struct BasicInputFileStreamWrapper<std::byte>
+		{
+			using file_stream_type = std::basic_ifstream<std::byte>;
+			using type = BasicInputFileStreamWrapper<std::byte>;
+			using string_type = std::basic_string<std::byte>;
+			using stream_buffer_iterator = std::istreambuf_iterator<std::byte>;
+
+			file_stream_type file_stream;
+
+			BasicInputFileStreamWrapper() :file_stream{} {}
+			virtual ~BasicInputFileStreamWrapper() { if (is_open()) close(); }
+
+			template<typename T> constexpr type& operator>>(T& value) { file_stream >> value; return *this; }
+
+			bool is_open() { return file_stream.is_open(); }
+			void close() { file_stream.close(); }
+			void open(std::filesystem::path file_path, std::ios_base::openmode open_mode = std::ios_base::in | std::ios_base::binary)
+			{
+				file_stream.open(file_path, std::ios_base::in | std::ios_base::binary | open_mode);
+				if (!is_open())
+					throw std::runtime_error(
+						std::string{
+							std::string{"ERROR! Cannot open "} +
+							file_path.string() +
+							std::string{" file in raii::BasicInputFileStreamWrapper<std::byte>::open() method." }
+						}.c_str()
+					);
+			}
+		};
+
+		template<typename Elem, typename Traits = std::char_traits<Elem>, typename Alloc = std::allocator<Elem>>
+		struct BasicOutputFileStreamWrapper
+		{
+			using file_stream_type = std::basic_ofstream<Elem, Traits>;
+			using type = BasicOutputFileStreamWrapper<Elem, Traits, Alloc>;
+			using string_type = std::basic_string<Elem, Traits, Alloc>;
+			using stream_buffer_iterator = std::ostreambuf_iterator<Elem, Traits>;
+
+			file_stream_type file_stream;
+
+			BasicOutputFileStreamWrapper() :file_stream{} {}
+			virtual ~BasicOutputFileStreamWrapper() { if (is_open()) close(); }
+
+			template<typename T> constexpr type& operator<<(const T& value) { file_stream << value; return *this; }
+			template<typename T> constexpr type& operator<<(T&& value) noexcept { file_stream << value; return *this; }
+
+			bool is_open() { return file_stream.is_open(); }
+			void close() { file_stream.flush(); file_stream.close(); }
+			void open(std::filesystem::path file_path, std::ios_base::openmode open_mode = std::ios_base::out)
+			{
+				file_stream.open(file_path, std::ios::out | open_mode);
+				if (!is_open())
+					throw std::runtime_error(
+						std::string{
+							std::string{"ERROR! Cannot open "} +
+							file_path.string() +
+							std::string{" file in raii::BasicOutputFileStreamWrapper<"} +
+							std::string{typeid(Elem).name()} +
+							std::string{", "} +
+							std::string{typeid(Traits).name()} +
+							std::string{", "} +
+							std::string{ typeid(Alloc).name() } +
+							std::string{ "::open() method." }
+						}.c_str()
+					);
+			}
+		};
+
+		template<>
+		struct BasicOutputFileStreamWrapper<std::byte>
+		{
+			using file_stream_type = std::basic_ofstream<std::byte>;
+			using type = BasicOutputFileStreamWrapper<std::byte>;
+			using string_type = std::basic_string<std::byte>;
+			using stream_buffer_iterator = std::ostreambuf_iterator<std::byte>;
+
+			file_stream_type file_stream;
+
+			BasicOutputFileStreamWrapper() :file_stream{} {}
+			virtual ~BasicOutputFileStreamWrapper() { if (is_open()) close(); }
+
+			template<typename T> constexpr type& operator<<(const T& value) { file_stream << value; return *this; }
+			template<typename T> constexpr type& operator<<(T&& value) noexcept { file_stream << value; return *this; }
+
+			bool is_open() { return file_stream.is_open(); }
+			void close() { file_stream.flush(); file_stream.close(); }
+			void open(std::filesystem::path file_path, std::ios_base::openmode open_mode = std::ios_base::out | std::ios_base::binary)
+			{
+				file_stream.open(file_path, std::ios::out | std::ios_base::binary | open_mode);
+				if (!is_open())
+					throw std::runtime_error(
+						std::string{
+							std::string{"ERROR! Cannot open "} +
+							file_path.string() +
+							std::string{" file in raii::BasicOutputFileStreamWrapper<std::byte>::open() method." }
+						}.c_str()
+					);
+			}
+		};
+
+		namespace native
+		{
+			namespace narrow_encoded 
+			{
+				using InputFileStreamWrapper = BasicInputFileStreamWrapper<char>;
+				using OutputFileStreamWrapper = BasicOutputFileStreamWrapper<char>;
+			}
+			namespace wide_encoded
+			{
+				using InputFileStreamWrapper = BasicInputFileStreamWrapper<wchar_t>;
+				using OutputFileStreamWrapper = BasicOutputFileStreamWrapper<wchar_t>;
+			}
+		}
+        #if __cplusplus >= 202002L
+		namespace utf8
+		{
+			using InputFileStreamWrapper = BasicInputFileStreamWrapper<char8_t>;
+			using OutputFileStreamWrapper = BasicOutputFileStreamWrapper<char8_t>;
+		}
+        #endif
+		namespace binary
+		{
+			using InputFileStreamWrapper = BasicInputFileStreamWrapper<std::byte>;
+			using OutputFileStreamWrapper = BasicOutputFileStreamWrapper<std::byte>;
+		}
+	}
+}
+)";
+
+        // stringformers.hpp content  
+        std::string stringformers_content = R"(
+#pragma once
+#include <cctype>
+#include <string>
+#include <string_view>
+#include <ranges>
+#include <algorithm>
+#include <vector>
+#include <unordered_set>
+#include <unordered_map>
+
+/**********************************************************************************************
+*
+*                   			String Transformers
+*                   			-------------------
+*    			This header provides utility functions for string manipulation,
+*    			including case conversion and tokenization.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
+
+namespace pooriayousefi::core
+{
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    constexpr decltype(auto) to_lowercase(const std::basic_string<Enc, EncTraits, EncAlloc>& word)
+    {
+        std::basic_string<Enc, EncTraits, EncAlloc> lowercased_word{};
+        lowercased_word.resize(std::ranges::size(word));
+        std::ranges::transform(std::ranges::cbegin(word), std::ranges::cend(word),
+            std::ranges::begin(lowercased_word), [](const auto& c) { return std::tolower(c); });
+        return lowercased_word;
+    }
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    constexpr decltype(auto) to_lowercase(std::basic_string_view<Enc, EncTraits> word_view)
+    {
+        std::basic_string<Enc, EncTraits, EncAlloc> lowercased_word{};
+        lowercased_word.resize(std::ranges::size(word_view));
+        std::ranges::transform(std::ranges::cbegin(word_view), std::ranges::cend(word_view),
+            std::ranges::begin(lowercased_word), [](const auto& c) { return std::tolower(c); });
+        return lowercased_word;
+    }
+
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    constexpr decltype(auto) to_uppercase(const std::basic_string<Enc, EncTraits, EncAlloc>& word)
+    {
+        std::basic_string<Enc, EncTraits, EncAlloc> uppercased_word{};
+        uppercased_word.resize(std::ranges::size(word));
+        std::ranges::transform(std::ranges::cbegin(word), std::ranges::cend(word),
+            std::ranges::begin(uppercased_word), [](const auto& c) { return std::toupper(c); });
+        return uppercased_word;
+    }
+    template<class Enc, class EncTraits = std::char_traits<Enc>, class EncAlloc = std::allocator<Enc>>
+    constexpr decltype(auto) to_uppercase(std::basic_string_view<Enc, EncTraits> word_view)
+    {
+        std::basic_string<Enc, EncTraits, EncAlloc> uppercased_word{};
+        uppercased_word.resize(std::ranges::size(word_view));
+        std::ranges::transform(std::ranges::cbegin(word_view), std::ranges::cend(word_view),
+            std::ranges::begin(uppercased_word), [](const auto& c) { return std::toupper(c); });
+        return uppercased_word;
+    }
+
+    template<class T, class Traits = std::char_traits<T>>
+    constexpr void tokenize(
+        std::basic_string_view<T, Traits> src, 
+        std::basic_string_view<T, Traits> delim,
+        std::vector<std::basic_string_view<T, Traits>>& tokens
+    )
+    {
+        tokens.clear();
+        tokens.reserve(src.size());
+
+        auto last_pos = src.find_first_not_of(delim, 0);
+        auto pos = src.find_first_of(delim, last_pos);
+
+        while (pos != std::basic_string_view<T, Traits>::npos || last_pos != std::basic_string_view<T, Traits>::npos)
+        {
+            tokens.emplace_back(src.substr(last_pos, pos - last_pos));
+            last_pos = src.find_first_not_of(delim, pos);
+            pos = src.find_first_of(delim, last_pos);
+        }
+    }
+    template<class T, class Traits = std::char_traits<T>>
+	constexpr void tokenize(
+        std::basic_string_view<T, Traits> src, 
+        std::basic_string_view<T, Traits> delim,
+        std::unordered_set<std::basic_string_view<T, Traits>>& tokens
+    )
+	{
+        tokens.clear();
+        tokens.reserve(src.size());
+
+        auto last_pos = src.find_first_not_of(delim, 0);
+        auto pos = src.find_first_of(delim, last_pos);
+
+		while (pos != std::basic_string_view<T, Traits>::npos || last_pos != std::basic_string_view<T, Traits>::npos)
+		{
+			tokens.emplace(src.substr(last_pos, pos - last_pos));
+			last_pos = src.find_first_not_of(delim, pos);
+			pos = src.find_first_of(delim, last_pos);
+		}
+	}
+	template<class T, class Traits = std::char_traits<T>>
+	auto tokenize(
+        std::basic_string_view<T, Traits> src, 
+        std::basic_string_view<T, Traits> delim,
+        std::unordered_map<std::basic_string_view<T, Traits>, size_t>& tokens
+    )
+	{
+        tokens.clear();
+        tokens.reserve(src.size());
+
+		auto last_pos = src.find_first_not_of(delim, 0);
+		auto pos = src.find_first_of(delim, last_pos);
+
+		while (pos != std::basic_string_view<T, Traits>::npos || last_pos != std::basic_string_view<T, Traits>::npos)
+		{
+			tokens[src.substr(last_pos, pos - last_pos)]++;
+			last_pos = src.find_first_not_of(delim, pos);
+			pos = src.find_first_of(delim, last_pos);
+		}
+	}
+}
+)";
+
+        // utilities.hpp content (truncated for brevity - the full content is very long)
+        std::string utilities_content = R"(
+#pragma once
+#include <concepts>
+#include <type_traits>
+#include <thread>
+#include <ratio>
+#include <utility>
+#include <chrono>
+#include <functional>
+#include <cstdint>
+#include <numbers>
+#include <vector>
+#include <algorithm>
+#include <ranges>
+#include <iterator>
+#include <unordered_map>
+#include <string_view>
+#include <random>
+#include <variant>
+#include <iostream>
+
+/**********************************************************************************************
+*
+*                   			    Utilities Header
+*                   			-----------------------
+*    		This header provides general utility functions and classes.
+*    		It includes:
+*    		- A wait_for class template for sleeping for various time durations.
+*    		- A runtime function template for measuring the execution time of a callable.
+*    		- A convert namespace with functions for unit conversions and number base conversions.
+*    		- A countdown function template for displaying a countdown in seconds.
+*    		- An iterate function template for iterating over a range with a specified step size
+*    		- Specializations of standard functors for std::byte and std::reference_wrapper.
+*    		- A histogram function template for counting occurrences of elements in a range.
+*    		- A frequencies function template for counting word frequencies in a string view.
+*    		- A do_n_times_shuffle_and_sample function template for shuffling and sampling a range.
+*    		- A Result struct template for encapsulating expected values or exceptions.
+*
+*                   			Developed by: Pooria Yousefi
+*				   				Date: 2025-06-26
+*				   				License: MIT
+*
+**********************************************************************************************/
+
+namespace pooriayousefi::core
+{
+    template<typename T> concept Arithmetic = std::floating_point<T> || std::integral<T>;
+
+    template<Arithmetic T> 
+    class wait_for
+    {
+    public:
+        wait_for() = delete;
+        wait_for(T value) :m_value{ value } {}
+        inline void nanoseconds() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<1, 1'000'000'000>>(m_value)); }
+        inline void microseconds() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<1, 1'000'000>>(m_value)); }
+        inline void milliseconds() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<1, 1'000>>(m_value)); }
+        inline void seconds() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<1>>(m_value)); }
+        inline void minutes() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<60>>(m_value)); }
+        inline void hours() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<3'600>>(m_value)); }
+        inline void days() { std::this_thread::sleep_for(std::chrono::duration<double, std::ratio<86'400>>(m_value)); }
+    private:
+        T m_value;
+    };
+
+    template<typename F, typename... Args> 
+    constexpr decltype(auto) runtime(F&& f, Args&&... args)
+    {
+        if constexpr (std::is_void_v<std::invoke_result_t<F, Args...>>)
+        {
+            auto ti{ std::chrono::high_resolution_clock::now() };
+            std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+            auto tf{ std::chrono::high_resolution_clock::now() };
+            return std::chrono::duration<double>(tf - ti).count();
+        }
+        else if constexpr (!std::is_void_v<std::invoke_result_t<F, Args...>>)
+        {
+            auto ti{ std::chrono::high_resolution_clock::now() };
+            auto retval{ std::invoke(std::forward<F>(f), std::forward<Args>(args)...) };
+            auto tf{ std::chrono::high_resolution_clock::now() };
+            return std::make_pair(std::move(retval), std::chrono::duration<double>(tf - ti).count());
+        }
+    }
+
+    namespace convert
+    {
+        template<std::floating_point T> constexpr T degrees_to_radians(T x) { return x * std::numbers::pi_v<T> / (T)180; }
+        template<std::floating_point T> constexpr T radians_to_degrees(T x) { return x * (T)180 / std::numbers::pi_v<T>; }
+        template<std::floating_point T> constexpr T Celsius_to_Fahrenheit(T x) { return (x * (T)9 / (T)5) + (T)32; }
+        template<std::floating_point T> constexpr T Fahrenheit_to_Celsius(T x) { return (x - (T)32) * (T)5 / (T)9; }
+    }
+
+    template<std::integral I> 
+    constexpr void countdown(I nsec)
+    {
+        std::cout << "\nT-" << nsec << ' ';
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        for (auto i{ static_cast<int64_t>(nsec) - static_cast<int64_t>(1) }; i >= static_cast<int64_t>(0); --i)
+        {
+            std::cout << i << ' ';
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+
+    template<std::input_or_output_iterator It, std::invocable<std::iter_value_t<It>&> F>
+    constexpr void iterate(It begin, size_t n, size_t step_size, F&& f)
+    {
+        size_t c(0);
+        auto it = begin;
+        do
+        {
+            std::invoke(std::forward<F>(f), *it);
+            c++;
+        } while (c < n && [&]() { it = std::ranges::next(it, step_size); return true; }());
+    }
+}
+
+namespace std
+{
+	template<> struct hash<byte>
+	{
+		constexpr const size_t operator()(const byte& b) const
+		{
+			hash<size_t> hasher{};
+            return hasher(to_integer<size_t>(b));
+		}
+	};
+
+	template<> struct equal_to<byte>
+	{
+		constexpr const bool operator()(const byte& lb, const byte& rb) const
+		{
+			return to_integer<size_t>(lb) == to_integer<size_t>(rb);
+		}
+	};
+
+	template<class T> struct hash<reference_wrapper<const T>>
+	{
+		constexpr const size_t operator()(const reference_wrapper<const T>& ref) const
+		{
+			hash<T> hasher{};
+			return hasher(ref.get());
+		}
+	};
+
+	template<class T> struct equal_to<reference_wrapper<const T>>
+	{
+		constexpr const bool operator()(const reference_wrapper<const T>& lhs, const reference_wrapper<const T>& rhs) const
+		{
+			return lhs.get() == rhs.get();
+		}
+	};
+}
+)";
+
+        // Write all header files
+        write_file(project_path + "/include/core/asyncops.hpp", asyncops_content);
+        write_file(project_path + "/include/core/raiiiofsw.hpp", raiiiofsw_content);
+        write_file(project_path + "/include/core/stringformers.hpp", stringformers_content);
+        write_file(project_path + "/include/core/utilities.hpp", utilities_content);
         
-        fs::copy(include_src_path, include_dst_path, fs::copy_options::skip_existing | fs::copy_options::recursive);
-        std::cout << "Template header files copied!" << std::endl;
+        std::cout << "Template header files created!" << std::endl;
     };
 
     // Create source file
@@ -255,24 +870,28 @@ int main(int argc, char* argv[])
         std::cout << "Creating source files..." << std::endl;
         
         // Main source file template
-        std::string main_cpp_template = "#include <iostream>\n";
-        main_cpp_template += "#include <exception>\n";
-        main_cpp_template += "#include <cstdlib>\n\n";
-        main_cpp_template += "// entry-point\n";
-        main_cpp_template += "int main()\n";
-        main_cpp_template += "{\n";
-        main_cpp_template += "    try\n";
-        main_cpp_template += "    {\n";
-        main_cpp_template += "        // start here ...\n";
-        main_cpp_template += "        \n";
-        main_cpp_template += "        return EXIT_SUCCESS;\n";
-        main_cpp_template += "    }\n";
-        main_cpp_template += "    catch (const std::exception& xxx)\n";
-        main_cpp_template += "    {\n";
-        main_cpp_template += "        std::cerr << \"Error: \" << xxx.what() << std::endl;\n";
-        main_cpp_template += "        return EXIT_FAILURE;\n";
-        main_cpp_template += "    }\n";
-        main_cpp_template += "}\n";
+        std::string main_cpp_template = R"(
+#include "asyncops.hpp"
+#include "raiiiofsw.hpp"
+#include "stringformers.hpp"
+#include "utilities.hpp"
+
+// entry-point
+int main()
+{
+    try
+    {
+        // start here ...
+        
+        return EXIT_SUCCESS;
+    }
+    catch (const std::exception& xxx)
+    {
+        std::cerr << "Error: " << xxx.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+}
+    )";
         
         write_file(project_path + "/src/main.cpp", main_cpp_template);
     };
@@ -346,14 +965,7 @@ int main(int argc, char* argv[])
         build_cpp += "        }\n";
         build_cpp += "        \n";
         build_cpp += "        // Common flags\n";
-        build_cpp += "        compile_flags += \" -std=c++23 -Wall -Wextra -Wpedantic -Iinclude\";\n";
-        build_cpp += "        \n";
-        build_cpp += "        // Add vcpkg paths if available\n";
-        build_cpp += "        if (fs::exists(\"vcpkg/installed/x64-linux/include\"))\n";
-        build_cpp += "        {\n";
-        build_cpp += "            compile_flags += \" -Ivcpkg/installed/x64-linux/include\";\n";
-        build_cpp += "            link_flags = \"-Lvcpkg/installed/x64-linux/lib\";\n";
-        build_cpp += "        }\n";
+        build_cpp += "        compile_flags += \" -std=c++23 -Wall -Wextra -Wpedantic -Iinclude -Iinclude/core\";\n";
         build_cpp += "        \n";
         build_cpp += "        if (output_type_ == \"executable\")\n";
         build_cpp += "        {\n";
@@ -505,6 +1117,9 @@ int main(int argc, char* argv[])
     {
         std::cout << "Creating VSCode configuration..." << std::endl;
         
+        // Create .vscode directory
+        fs::create_directories(fs::path(project_path) / fs::path(".vscode"));
+        
         std::string vscode_settings = "{\n";
         vscode_settings += "    \"C_Cpp.default.compilerPath\": \"/usr/bin/g++\",\n";
         vscode_settings += "    \"C_Cpp.default.intelliSenseMode\": \"linux-gcc-x64\",\n";
@@ -512,7 +1127,7 @@ int main(int argc, char* argv[])
         vscode_settings += "    \"C_Cpp.default.cStandard\": \"c17\",\n";
         vscode_settings += "    \"C_Cpp.default.includePath\": [\n";
         vscode_settings += "        \"${workspaceFolder}/include\",\n";
-        vscode_settings += "        \"${workspaceFolder}/vcpkg/installed/x64-linux/include\"\n";
+        vscode_settings += "        \"${workspaceFolder}/include/core\"\n";
         vscode_settings += "    ],\n";
         vscode_settings += "    \"C_Cpp.default.defines\": [],\n";
         vscode_settings += "    \"editor.formatOnSave\": true,\n";
@@ -612,10 +1227,9 @@ int main(int argc, char* argv[])
         std::cout << "Creating README..." << std::endl;
         
         std::string readme_content = "# " + project_name + "\n\n";
-        readme_content += "A minimalistic C++ project with vcpkg package management and command-line build system.\n\n";
+        readme_content += "A minimalistic C++ project with command-line build system.\n\n";
         readme_content += "## Features\n\n";
         readme_content += "- Modern C++23 support\n";
-        readme_content += "- Local vcpkg package manager integration (copied from template)\n";
         readme_content += "- Command-line build system (no CMake/Makefile required)\n";
         readme_content += "- Support for static executables, static libraries, and dynamic libraries\n";
         readme_content += "- VSCode configuration\n";
@@ -626,19 +1240,18 @@ int main(int argc, char* argv[])
         readme_content += "```\n";
         readme_content += project_name + "/\n";
         readme_content += "├── include/                 # Header files (including template headers)\n";
+        readme_content += "│   └── core/               # Core template headers\n";
+        readme_content += "│       ├── asyncops.hpp    # Async operations & coroutines\n";
+        readme_content += "│       ├── raiiiofsw.hpp   # RAII filesystem wrappers\n";
+        readme_content += "│       ├── stringformers.hpp # String formatting utilities\n";
+        readme_content += "│       └── utilities.hpp   # General utility functions\n";
         readme_content += "├── src/                     # Source files\n";
         readme_content += "├── tests/                   # Test files\n";
         readme_content += "├── build/                   # Build outputs\n";
         readme_content += "│   ├── debug/              # Debug builds\n";
         readme_content += "│   └── release/            # Release builds\n";
-        readme_content += "├── vcpkg/                   # Local vcpkg installation\n";
-        readme_content += "├── .vcpkg-cache/            # Binary package cache\n";
         readme_content += "├── .vscode/                 # VSCode configuration\n";
         readme_content += "├── builder.cpp              # Build system source\n";
-        readme_content += "├── vcpkg.json               # Package manifest\n";
-        readme_content += "├── vcpkg-configuration.json # vcpkg configuration\n";
-        readme_content += "├── install-packages.sh      # Automated package installer\n";
-        readme_content += "├── update-vcpkg.sh          # vcpkg updater\n";
         readme_content += "└── README.md                # This file\n";
         readme_content += "```\n\n";
         readme_content += "## Build Instructions\n\n";
@@ -670,43 +1283,12 @@ int main(int argc, char* argv[])
         readme_content += "- `--executable`: Build static executable (default)\n";
         readme_content += "- `--static`: Build static library\n";
         readme_content += "- `--dynamic`: Build dynamic library\n\n";
-        readme_content += "## Package Management\n\n";
-        readme_content += "The project uses a fully automated vcpkg setup with binary caching and automatic baseline management.\n\n";
-        readme_content += "### Installing Packages\n\n";
-        readme_content += "```bash\n";
-        readme_content += "# Install packages from vcpkg.json\n";
-        readme_content += "./install-packages.sh\n\n";
-        readme_content += "# Install specific packages\n";
-        readme_content += "./install-packages.sh fmt spdlog nlohmann-json\n";
-        readme_content += "```\n\n";
-        readme_content += "### Updating vcpkg\n\n";
-        readme_content += "```bash\n";
-        readme_content += "# Update vcpkg to latest version and baseline\n";
-        readme_content += "./update-vcpkg.sh\n";
-        readme_content += "```\n\n";
-        readme_content += "### Adding Dependencies\n\n";
-        readme_content += "Edit `vcpkg.json` and add packages to the dependencies array:\n";
-        readme_content += "```json\n";
-        readme_content += "{\n";
-        readme_content += "  \"dependencies\": [\n";
-        readme_content += "    \"fmt\",\n";
-        readme_content += "    \"spdlog\",\n";
-        readme_content += "    \"nlohmann-json\"\n";
-        readme_content += "  ]\n";
-        readme_content += "}\n";
-        readme_content += "```\n\n";
-        readme_content += "Then run `./install-packages.sh` to install them.\n\n";
-        readme_content += "### Features\n\n";
-        readme_content += "- **Binary Caching**: Packages are cached in `.vcpkg-cache/` for faster rebuilds\n";
-        readme_content += "- **Automatic Baseline**: vcpkg baseline is determined automatically\n";
-        readme_content += "- **Easy Updates**: One command to update vcpkg and baseline\n";
-        readme_content += "- **Project Isolation**: Each project has its own vcpkg and cache\n\n";
         readme_content += "## Template Headers\n\n";
-        readme_content += "The following header files are automatically copied from the template:\n";
-        readme_content += "- `asyncops.hpp`: Async operations and coroutines utilities\n";
-        readme_content += "- `raiiiofsw.hpp`: RAII filesystem wrappers\n";
-        readme_content += "- `stringformers.hpp`: String formatting and manipulation utilities\n";
-        readme_content += "- `utilities.hpp`: General utility functions\n\n";
+        readme_content += "The following header files are automatically copied to `include/core/`:\n";
+        readme_content += "- `core/asyncops.hpp`: Async operations and coroutines utilities\n";
+        readme_content += "- `core/raiiiofsw.hpp`: RAII filesystem wrappers\n";
+        readme_content += "- `core/stringformers.hpp`: String formatting and manipulation utilities\n";
+        readme_content += "- `core/utilities.hpp`: General utility functions\n\n";
         readme_content += "## Development\n\n";
         readme_content += "The project follows these conventions:\n";
         readme_content += "- **Classes/Structs**: PascalCase (e.g., `ExampleClass`)\n";
@@ -761,7 +1343,6 @@ int main(int argc, char* argv[])
         project_name = sanitize_cpp_name(path.stem().string());
         
         create_directory_structure();
-        setup_vcpkg();
         create_source_files();
         copy_template_headers();
         create_build_system();
@@ -776,10 +1357,6 @@ int main(int argc, char* argv[])
         std::cout << "2. g++ -std=c++23 builder.cpp -o builder" << std::endl;
         std::cout << "3. ./builder --release --executable" << std::endl;
         std::cout << "4. ./build/release/" << project_name << std::endl;
-        std::cout << "\nPackage management:" << std::endl;
-        std::cout << "- Add packages to vcpkg.json" << std::endl;
-        std::cout << "- Run ./install-packages.sh to install them" << std::endl;
-        std::cout << "- Run ./update-vcpkg.sh to update vcpkg when needed" << std::endl;
         
         return EXIT_SUCCESS;
     }
