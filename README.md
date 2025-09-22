@@ -46,12 +46,12 @@ Every project includes:
 
 ```
 your-project/
-├── include/                    # Header files (embedded content)
+├── include/                   # Header files (embedded content)
 │   └── core/                  # Core template headers
 │       ├── asyncops.hpp       # Async operations & coroutines
 │       ├── raiiiofsw.hpp      # RAII filesystem wrappers
-│       ├── stringformers.hpp # String formatting utilities
-│       └── utilities.hpp     # General utility functions
+│       ├── stringformers.hpp  # String formatting utilities
+│       └── utilities.hpp      # General utility functions
 ├── src/                       # Source files
 │   └── main.cpp               # Main entry point with basic template
 ├── tests/                     # Test directory (empty, ready for use)
